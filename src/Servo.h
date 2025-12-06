@@ -138,9 +138,17 @@ public:
         _minPulseWidthUs = minPulseWidthUs;
         _maxPulseWidthUs = maxPulseWidthUs;
         _periodUs = tempPeriodUs;
-
-        ledcSetup(_channel, frequency, TIMER_RESOLUTION);
+#ifdef ESP_ARDUINO_VERSION_MAJOR
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+	ledcAttachChannel(_pin, frequency, TIMER_RESOLUTION, _channel);
+#else
+	ledcSetup(_channel, frequency, TIMER_RESOLUTION);
         ledcAttachPin(_pin, _channel);
+#endif
+#else
+	ledcSetup(_channel, frequency, TIMER_RESOLUTION);
+        ledcAttachPin(_pin, _channel);
+#endif
         return true;
     }
 
@@ -159,7 +167,15 @@ public:
         if (_channel == (channel_next_free - 1))
             channel_next_free--;
 
+#ifdef ESP_ARDUINO_VERSION_MAJOR
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+        ledcDetach(_pin);
+#else
         ledcDetachPin(_pin);
+#endif
+#else
+        ledcDetachPin(_pin);
+#endif
         _pin = PIN_NOT_ATTACHED;
         return true;
     }
@@ -194,7 +210,15 @@ public:
         }
         pulseWidthUs = constrain(pulseWidthUs, _minPulseWidthUs, _maxPulseWidthUs);
         _pulseWidthTicks = _usToTicks(pulseWidthUs);
-        ledcWrite(_channel, _pulseWidthTicks);
+#ifdef ESP_ARDUINO_VERSION_MAJOR
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+	ledcWrite(_pin, _pulseWidthTicks);
+#else
+	ledcWrite(_channe, _pulseWidthTicks);
+#endif
+#else
+	ledcWrite(_channe, _pulseWidthTicks);
+#endif
     }
 
     /**
@@ -215,7 +239,15 @@ public:
         if (!this->attached()) {
             return 0;
         }
-        int duty = ledcRead(_channel);
+#ifdef ESP_ARDUINO_VERSION_MAJOR
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+	int duty = ledcRead(_pin);
+#else
+	int duty = ledcRead(_channel);
+#endif
+#else
+	int duty = ledcRead(_channel);
+#endif
         return _ticksToUs(duty);
     }
 
@@ -249,7 +281,8 @@ public:
     T mapTemplate(T x, T in_min, T in_max, T out_min, T out_max) const {
         // Check if T is a floating-point type using std::is_floating_point
         constexpr bool is_float_type = std::is_floating_point<T>::value;
-        if (is_float_type) {
+    
+        if constexpr (is_float_type) {
             // If T is a floating-point type, use the floating-point formula
             return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
         } else {
